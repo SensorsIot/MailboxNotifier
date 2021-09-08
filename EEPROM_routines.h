@@ -66,14 +66,13 @@ void SaveLMICtoEEPROM(int deepsleep_sec) {
 
 // Load LMIC structure from EEPROM to avoid re-joining
 void LoadLMICfromEEPROM() {
-  Serial.print("Retrieving EEPROM ");
   EEPROM.get(0, EEPROM_LMIC);
   if (EEPROM_LMIC.seqnoUp != 0) {
-    Serial.println("Retrieving LMIC");
+    Serial.println("Retrieving LMICdata");
     LMIC = EEPROM_LMIC;
   }
   else {
     LMIC.seqnoUp = 0;
-    Serial.println("Sequence set to 0");
+    Serial.println("No valid EEPROM data found");
   }
 }

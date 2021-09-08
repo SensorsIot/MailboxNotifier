@@ -11,19 +11,20 @@
 #define TTN_DEVEUI { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 } // TTN Device EUI with "lsb"
 #define TTN_APPKEY { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 } // TTN App Key with "msb"
 
+#define POWERPIN 4
+#define BATTPIN 39
+#define BATTFACTOR  0.0857
+
+
 #include <arduino.h>
 #include <lmic.h>
 #include <hal/hal.h>
 #include <SPI.h>
 #include <EEPROM.h>
 #include "EEPROM_routines.h"
-// #include <ttn_credentials.h>
+//#include <ttn_credentials.h>
 
-#define POWERPIN 4
 #define EEPROM_SIZE 1000
-
-#define BATTPIN 39
-#define BATTFACTOR  0.0857
 
 #define POWEROFF // power off instead of deep sleep
 
@@ -366,7 +367,7 @@ void do_send(osjob_t *j)
     float voltage = (float)_adc * BATTFACTOR;
     int _hi = (int)voltage;
     Serial.print("Voltage ");
-    Serial.println(_hi);
+    Serial.println(_hi/ 100.0);
     mydata[0] = _hi & 0xFF;
     mydata[1] = _hi >> 8 & 0xFF;
     LMIC_setTxData2(1, mydata, 2, 0);
