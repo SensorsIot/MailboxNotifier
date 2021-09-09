@@ -58,18 +58,12 @@ const unsigned TX_INTERVAL = 3600;
 // Saves the LMIC structure during DeepSleep
 RTC_DATA_ATTR lmic_t RTC_LMIC;
 
-#define PIN_LMIC_NSS 18
-#define PIN_LMIC_RST 14
-#define PIN_LMIC_DIO0 26
-#define PIN_LMIC_DIO1 33
-#define PIN_LMIC_DIO2 32
-
-// Pin mapping
+// Pin mapping for TTGO V2
 const lmic_pinmap lmic_pins = {
-  .nss = PIN_LMIC_NSS,
+  .nss = 18,
   .rxtx = LMIC_UNUSED_PIN,
-  .rst = PIN_LMIC_RST,
-  .dio = {PIN_LMIC_DIO0, PIN_LMIC_DIO1, PIN_LMIC_DIO2},
+  .rst = LMIC_UNUSED_PIN,
+  .dio = {26, 33, LMIC_UNUSED_PIN},
 };
 
 // opmode def
@@ -428,9 +422,10 @@ void GoDeepSleep()
 void switchOff() {
   Serial.println("---------POWER DOWN");
   digitalWrite(POWERPIN, LOW);  // Switch board off
-  delay(TX_INTERVAL * 1000); // These lines are only for test. They are never reached
+  // These lines are only for test. They are never reached
   // during normal operation
-  ESP.restart();
+  esp_sleep_enable_timer_wakeup(TX_INTERVAL * 1000000);
+  esp_deep_sleep_start();
 }
 
 void setup()
@@ -448,7 +443,8 @@ void setup()
   // LMIC init
   os_init();
 
-  // Reset the MAC state. Session and pending data transfers will be discarded.  LMIC_reset();
+  // Reset the MAC state. Session and pending data transfers will be discarded.
+  LMIC_reset();
 
 #ifdef POWEROFF
   LoadLMICfromEEPROM();
