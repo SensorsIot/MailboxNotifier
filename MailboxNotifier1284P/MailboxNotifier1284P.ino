@@ -38,6 +38,25 @@
 #include <SPI.h>
 #include <LowPower.h>
 #include "PinChangeInterrupt.h" // https://github.com/NicoHood/PinChangeInterrupt // you can also use the attachInterrupt() function from Arduino, to be consistent through all examples this lib is here used too
+
+
+// Create a file TTN_Credentials.h and add the following lines with your keys from TTN or fill in your keys below
+#define FILLMEIN_APPEUI 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+#define FILLMEIN_DEVEUI 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+#define FILLMEIN_APPKEY 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+// #include "TTN_Credentials.h"
+
+
+// #define DEBUG
+
+#ifdef DEBUG
+#define DEBUGPRINT(x) Serial.print(x)
+#define DEBUGPRINTLN(x) Serial.println(x)
+#else
+#define DEBUGPRINT(x)
+#define DEBUGPRINTLN(x)
+#endif
+
 bool next = false;
 const int donePin = 3; // define done pin where TPL5010 is connected to, in our case pin 3
 const int TPLWakePin = 2; // define WDT pin where TPL5010 is connected to, in our case pin 2
@@ -69,18 +88,24 @@ const float RSUP = 99.9;         // voltage divider resistor from A0 to VCC or U
 // first. When copying an EUI from ttnctl output, this means to reverse
 // the bytes. For TTN issued EUIs the last bytes should be 0xD5, 0xB3,
 // 0x70.
-static const u1_t PROGMEM APPEUI[8] = { FILLMEIN };
-void os_getArtEui(u1_t* buf) { memcpy_P(buf, APPEUI, 8); }
+static const u1_t PROGMEM APPEUI[8] = { FILLMEIN_APPEUI };
+void os_getArtEui(u1_t* buf) {
+  memcpy_P(buf, APPEUI, 8);
+}
 
 // This should also be in little endian format, see above.
-static const u1_t PROGMEM DEVEUI[8] = { FILLMEIN };
-void os_getDevEui(u1_t* buf) { memcpy_P(buf, DEVEUI, 8); }
+static const u1_t PROGMEM DEVEUI[8] = { FILLMEIN_DEVEUI };
+void os_getDevEui(u1_t* buf) {
+  memcpy_P(buf, DEVEUI, 8);
+}
 
 // This key should be in big endian format (or, since it is not really a
 // number but a block of memory, endianness does not really apply). In
 // practice, a key taken from ttnctl can be copied as-is.
-static const u1_t PROGMEM APPKEY[16] = { FILLMEIN };
-void os_getDevKey(u1_t* buf) { memcpy_P(buf, APPKEY, 16); }
+static const u1_t PROGMEM APPKEY[16] = { FILLMEIN_APPKEY };
+void os_getDevKey(u1_t* buf) {
+  memcpy_P(buf, APPKEY, 16);
+}
 
 static osjob_t sendjob;
 
@@ -97,56 +122,60 @@ const lmic_pinmap lmic_pins = {
 
 void printHex2(unsigned v) {
   v &= 0xff;
+#ifdef DEBUG
   if (v < 16)
     Serial.print('0');
   Serial.print(v, HEX);
+#endif
 }
 
 void onEvent (ev_t ev) {
-  Serial.print(os_getTime());
-  Serial.print(": ");
+  DEBUGPRINT(os_getTime());
+  DEBUGPRINT(": ");
   switch (ev) {
     case EV_SCAN_TIMEOUT:
-      Serial.println(F("EV_SCAN_TIMEOUT"));
+      DEBUGPRINTLN(F("EV_SCAN_TIMEOUT"));
       break;
     case EV_BEACON_FOUND:
-      Serial.println(F("EV_BEACON_FOUND"));
+      DEBUGPRINTLN(F("EV_BEACON_FOUND"));
       break;
     case EV_BEACON_MISSED:
-      Serial.println(F("EV_BEACON_MISSED"));
+      DEBUGPRINTLN(F("EV_BEACON_MISSED"));
       break;
     case EV_BEACON_TRACKED:
-      Serial.println(F("EV_BEACON_TRACKED"));
+      DEBUGPRINTLN(F("EV_BEACON_TRACKED"));
       break;
     case EV_JOINING:
-      Serial.println(F("EV_JOINING"));
+      DEBUGPRINTLN(F("EV_JOINING"));
       break;
     case EV_JOINED:
-      Serial.println(F("EV_JOINED"));
+      DEBUGPRINTLN(F("EV_JOINED"));
       {
         u4_t netid = 0;
         devaddr_t devaddr = 0;
         u1_t nwkKey[16];
         u1_t artKey[16];
         LMIC_getSessionKeys(&netid, &devaddr, nwkKey, artKey);
+#ifdef DEBUG
         Serial.print("netid: ");
         Serial.println(netid, DEC);
         Serial.print("devaddr: ");
         Serial.println(devaddr, HEX);
         Serial.print("AppSKey: ");
+#endif
         for (size_t i = 0; i < sizeof(artKey); ++i) {
           if (i != 0)
-            Serial.print("-");
+            DEBUGPRINT("-");
           printHex2(artKey[i]);
         }
-        Serial.println("");
-        Serial.print("NwkSKey: ");
+        DEBUGPRINTLN("");
+        DEBUGPRINT("NwkSKey: ");
         for (size_t i = 0; i < sizeof(nwkKey); ++i) {
           if (i != 0)
-            Serial.print("-");
+            DEBUGPRINT("-");
           printHex2(nwkKey[i]);
         }
-        Serial.println();
+        DEBUGPRINTLN();
       }
       // Disable link check validation (automatically enabled
       // during join, but because slow data rates change max TX
@@ -158,68 +187,68 @@ void onEvent (ev_t ev) {
       || point in wasting codespace on it.
       ||
       || case EV_RFU1:
-      ||     Serial.println(F("EV_RFU1"));
+      ||     DEBUGPRINTLN(F("EV_RFU1"));
       ||     break;
     */
     case EV_JOIN_FAILED:
-      Serial.println(F("EV_JOIN_FAILED"));
+      DEBUGPRINTLN(F("EV_JOIN_FAILED"));
       break;
     case EV_REJOIN_FAILED:
-      Serial.println(F("EV_REJOIN_FAILED"));
+      DEBUGPRINTLN(F("EV_REJOIN_FAILED"));
       break;
     case EV_TXCOMPLETE:
-      Serial.println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
+      DEBUGPRINTLN(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
       if (LMIC.txrxFlags & TXRX_ACK)
-        Serial.println(F("Received ack"));
+        DEBUGPRINTLN(F("Received ack"));
       if (LMIC.dataLen) {
-        Serial.print(F("Received "));
-        Serial.print(LMIC.dataLen);
-        Serial.println(F(" bytes of payload"));
+        DEBUGPRINT(F("Received "));
+        DEBUGPRINT(LMIC.dataLen);
+        DEBUGPRINTLN(F(" bytes of payload"));
       }
       // Schedule next transmission
       next = true;
       //os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
       break;
     case EV_LOST_TSYNC:
-      Serial.println(F("EV_LOST_TSYNC"));
+      DEBUGPRINTLN(F("EV_LOST_TSYNC"));
       break;
     case EV_RESET:
-      Serial.println(F("EV_RESET"));
+      DEBUGPRINTLN(F("EV_RESET"));
       break;
     case EV_RXCOMPLETE:
       // data received in ping slot
-      Serial.println(F("EV_RXCOMPLETE"));
+      DEBUGPRINTLN(F("EV_RXCOMPLETE"));
       break;
     case EV_LINK_DEAD:
-      Serial.println(F("EV_LINK_DEAD"));
+      DEBUGPRINTLN(F("EV_LINK_DEAD"));
       break;
     case EV_LINK_ALIVE:
-      Serial.println(F("EV_LINK_ALIVE"));
+      DEBUGPRINTLN(F("EV_LINK_ALIVE"));
       break;
     /*
       || This event is defined but not used in the code. No
       || point in wasting codespace on it.
       ||
       || case EV_SCAN_FOUND:
-      ||    Serial.println(F("EV_SCAN_FOUND"));
+      ||    DEBUGPRINTLN(F("EV_SCAN_FOUND"));
       ||    break;
     */
     case EV_TXSTART:
-      Serial.println(F("EV_TXSTART"));
+      DEBUGPRINTLN(F("EV_TXSTART"));
       break;
     case EV_TXCANCELED:
-      Serial.println(F("EV_TXCANCELED"));
+      DEBUGPRINTLN(F("EV_TXCANCELED"));
       break;
     case EV_RXSTART:
       /* do not print anything -- it wrecks timing */
       break;
     case EV_JOIN_TXCOMPLETE:
-      Serial.println(F("EV_JOIN_TXCOMPLETE: no JoinAccept"));
+      DEBUGPRINTLN(F("EV_JOIN_TXCOMPLETE: no JoinAccept"));
       break;
 
     default:
-      Serial.print(F("Unknown event: "));
-      Serial.println((unsigned) ev);
+      DEBUGPRINT(F("Unknown event: "));
+      DEBUGPRINTLN((unsigned) ev);
       break;
   }
 }
@@ -227,13 +256,13 @@ void onEvent (ev_t ev) {
 void do_send(osjob_t* j) {
   // Check if there is not a current TX/RX job running
   if (LMIC.opmode & OP_TXRXPEND) {
-    Serial.println(F("OP_TXRXPEND, not sending"));
+    DEBUGPRINTLN(F("OP_TXRXPEND, not sending"));
   } else {
     // Prepare upstream data transmission at the next possible time.
     int voltage = readBattVoltage();
 
-    Serial.print("voltage ");
-    Serial.println(voltage);
+    DEBUGPRINT("voltage ");
+    DEBUGPRINTLN(voltage);
 
     //Prepare uplink data
     byte mydata[3];
@@ -243,8 +272,8 @@ void do_send(osjob_t* j) {
 
     /*
 
-    //TTNv3 Payload decoder
-    function decodeUplink(input) {
+      //TTNv3 Payload decoder
+      function decodeUplink(input) {
       var data = {};
       if (input.fPort == 1) {
         data.voltage = ((input.bytes[1] << 8) | input.bytes[2]) / 100.00;
@@ -255,12 +284,12 @@ void do_send(osjob_t* j) {
         warnings: [],
         errors: []
       };
-    }
-    
+      }
+
     */
 
     LMIC_setTxData2(1, mydata, sizeof(mydata), 0);
-    Serial.println(F("Packet queued"));
+    DEBUGPRINTLN(F("Packet queued"));
 
     // Set wakeupReason value to 99, if we ever transmit the value '99', then the device woke up because of an unknown reason
     wakeupReason = 99;
@@ -268,9 +297,61 @@ void do_send(osjob_t* j) {
   // Next TX is scheduled after TX_COMPLETE event.
 }
 
+void wakeupFromTimer(void) {
+  wakeupReason = 1;
+  DEBUGPRINTLN("Timer Interrupt");
+}
+
+void wakeupFromDoorSwitch(void) {
+  wakeupReason = 2;
+  DEBUGPRINTLN("User Interrupt");
+}
+
+void wakeupFromLidSwitch(void) {
+  wakeupReason = 3;
+  DEBUGPRINTLN("Door");
+}
+
+uint16_t analogOversample(int pin) {
+  uint16_t reading = 0;
+  int i = 0;
+  while (i < 8)
+  {
+    i++;
+    reading = reading + analogRead(pin);
+  }
+  return reading >> 3;
+}
+
+int readBattVoltage() {
+  //Enable voltage divider, warm up ADC, read voltage, disable voltage divider
+  digitalWrite(voltageDividerPin, HIGH);
+  for (int i = 0; i < 16; i++) analogRead(batteryReadPin); // first readings are not accurate
+  uint16_t ADCreading = analogOversample(batteryReadPin);
+  digitalWrite(voltageDividerPin, LOW);
+
+  //Convert analog ADC reading to millivolts
+  int _voltage = (((ADCreading * AREF / 1024.0) * (RSUP + RGND) / RGND) * 100);
+  return _voltage;
+}
+void do_sendmac(osjob_t* j) {
+  // This function is called if we need to process a MAC message
+  // Check if there is not a current TX/RX job running
+  if (LMIC.opmode & OP_TXRXPEND) {
+    DEBUGPRINTLN(F("OP_TXRXPEND, not sending"));
+  }
+  else {
+    // Prepare upstream data transmission at the next possible time.
+    byte mydata[1];
+    LMIC_setTxData2(0, mydata, sizeof(mydata), 0);
+    DEBUGPRINTLN(F("Packet queued (MAC command)"));
+  }
+  // Next TX is scheduled after TX_COMPLETE event.
+}
+
 void setup() {
   Serial.begin(115200);
-  Serial.println("Starting");
+  DEBUGPRINTLN("Starting");
 
 #ifdef VCC_ENABLE
   // For Pinoccio Scout boards
@@ -293,7 +374,7 @@ void setup() {
   // Attach user interrupt pin
   attachPCINT(digitalPinToPCINT(lidSwitch), wakeupFromLidSwitch, HIGH);
 
-    // Attach user interrupt pin
+  // Attach user interrupt pin
   attachPCINT(digitalPinToPCINT(doorSwitch), wakeupFromDoorSwitch, HIGH);
 
   // Pin settings to read supply voltage
@@ -329,12 +410,12 @@ void loop() {
   }
   else {
     if (LMIC.pendMacLen > 0) {
-      Serial.println("Pending MAC message");
+      DEBUGPRINTLN("Pending MAC message");
       next = false;
       do_sendmac(&sendjob);
     }
     else {
-	  Serial.println("No Pending MAC message");
+      DEBUGPRINTLN("No Pending MAC message");
       Serial.flush(); // give the serial print chance to complete
       delay(20); // We need here some delay to prevent wakeup from WDT we used before. 20ms seems to be safe.
 
@@ -351,58 +432,6 @@ void loop() {
 
       next = false;
       do_send(&sendjob);
-	}
-  }
-}
-
-void wakeupFromTimer(void) {
-  wakeupReason = 1;
-  // Serial.println("Timer Interrupt");
-}
-
-void wakeupFromDoorSwitch(void) {
-  wakeupReason = 2;
-  // Serial.println("User Interrupt");
-}
-
-void wakeupFromLidSwitch(void) {
-  wakeupReason = 3;
-  // Serial.println("Door");
-}
-
-uint16_t analogOversample(int pin) {
-  uint16_t reading = 0;
-  int i = 0;
-  while (i < 8)
-  {
-    i++;
-    reading = reading + analogRead(pin);
-  }
-  return reading >> 3;
-}
-
-int readBattVoltage() {
-  //Enable voltage divider, warm up ADC, read voltage, disable voltage divider
-  digitalWrite(voltageDividerPin, HIGH);
-  for (int i = 0; i < 16; i++) analogRead(batteryReadPin); // first readings are not accurate
-  uint16_t ADCreading = analogOversample(batteryReadPin);
-  digitalWrite(voltageDividerPin, LOW);
-
-  //Convert analog ADC reading to millivolts
-  int _voltage = (((ADCreading * AREF / 1024.0) * (RSUP + RGND) / RGND) * 100);
-  return _voltage;
-}
-void do_sendmac(osjob_t* j) {
-	// This function is called if we need to process a MAC message
-    // Check if there is not a current TX/RX job running
-    if (LMIC.opmode & OP_TXRXPEND) {
-        Serial.println(F("OP_TXRXPEND, not sending"));
     }
-    else {
-        // Prepare upstream data transmission at the next possible time.
-        byte mydata[1];
-        LMIC_setTxData2(0, mydata, sizeof(mydata), 0);
-        Serial.println(F("Packet queued (MAC command)"));
-    }
-    // Next TX is scheduled after TX_COMPLETE event.
+  }
 }
