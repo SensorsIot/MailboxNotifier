@@ -42,6 +42,7 @@ bool next = false;
 const int donePin = 3; // define done pin where TPL5010 is connected to, in our case pin 3
 const int TPLWakePin = 2; // define WDT pin where TPL5010 is connected to, in our case pin 2
 const int doorSwitch = 4; // define wakeup pin, in our case pin 4 which is pulled up to VCC with a 10K resistor on the board
+const int lidSwitch = 17; // lid switch connected to SDA pin
 uint8_t wakeupReason = 0; // set to 0 means startup, set to 1 means wakeup from TPL5010, set to 2 means wakeup from user pin, set to 3 means unknown wakeup reason
 int batteryReadPin = A0;        // set the input pin for the battery measurement
 int voltageDividerPin = 0;      // set the pin to enable the voltage divider
@@ -68,24 +69,18 @@ const float RSUP = 99.9;         // voltage divider resistor from A0 to VCC or U
 // first. When copying an EUI from ttnctl output, this means to reverse
 // the bytes. For TTN issued EUIs the last bytes should be 0xD5, 0xB3,
 // 0x70.
-static const u1_t PROGMEM APPEUI[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-void os_getArtEui(u1_t* buf) {
-  memcpy_P(buf, APPEUI, 8);
-}
+static const u1_t PROGMEM APPEUI[8] = { FILLMEIN };
+void os_getArtEui(u1_t* buf) { memcpy_P(buf, APPEUI, 8); }
 
 // This should also be in little endian format, see above.
-static const u1_t PROGMEM DEVEUI[8] = { 0x48, 0x5C, 0x04, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 };
-void os_getDevEui(u1_t* buf) {
-  memcpy_P(buf, DEVEUI, 8);
-}
+static const u1_t PROGMEM DEVEUI[8] = { FILLMEIN };
+void os_getDevEui(u1_t* buf) { memcpy_P(buf, DEVEUI, 8); }
 
 // This key should be in big endian format (or, since it is not really a
 // number but a block of memory, endianness does not really apply). In
 // practice, a key taken from ttnctl can be copied as-is.
-static const u1_t PROGMEM APPKEY[16] = { 0xB3, 0xAD, 0x11, 0x80, 0x57, 0x4F, 0x8C, 0xCE, 0x4A, 0x67, 0x4C, 0x7F, 0x81, 0x22, 0x82, 0x14 };
-void os_getDevKey(u1_t* buf) {
-  memcpy_P(buf, APPKEY, 16);
-}
+static const u1_t PROGMEM APPKEY[16] = { FILLMEIN };
+void os_getDevKey(u1_t* buf) { memcpy_P(buf, APPKEY, 16); }
 
 static osjob_t sendjob;
 
@@ -242,9 +237,27 @@ void do_send(osjob_t* j) {
 
     //Prepare uplink data
     byte mydata[3];
-    mydata[0] = voltage >> 8;
-    mydata[1] = voltage;
-    mydata[2] = wakeupReason;
+    mydata[0] = wakeupReason;
+    mydata[1] = voltage >> 8;
+    mydata[2] = voltage;
+
+    /*
+
+    //TTNv3 Payload decoder
+    function decodeUplink(input) {
+      var data = {};
+      if (input.fPort == 1) {
+        data.voltage = ((input.bytes[1] << 8) | input.bytes[2]) / 100.00;
+        data.reason = (input.bytes[0]);
+      }
+      return {
+        data: data,
+        warnings: [],
+        errors: []
+      };
+    }
+    
+    */
 
     LMIC_setTxData2(1, mydata, sizeof(mydata), 0);
     Serial.println(F("Packet queued"));
@@ -315,22 +328,30 @@ void loop() {
     }
   }
   else {
-    Serial.flush(); // give the serial print chance to complete
-    delay(20); // We need here some delay to prevent wakeup from WDT we used before. 20ms seems to be safe.
+    if (LMIC.pendMacLen > 0) {
+      Serial.println("Pending MAC message");
+      next = false;
+      do_sendmac(&sendjob);
+    }
+    else {
+	  Serial.println("No Pending MAC message");
+      Serial.flush(); // give the serial print chance to complete
+      delay(20); // We need here some delay to prevent wakeup from WDT we used before. 20ms seems to be safe.
 
-    // set DONE high for 100 micro seconds to tell the TPL5010 we're done
-    // if DONE was not high between TPL5010 interrupts, TPL5010 will reset the MCU through the reset pin if connected, otherwise it will do nothing until 'DONE' was set high once
-    digitalWrite(donePin, HIGH);
-    delayMicroseconds(100);
-    digitalWrite(donePin, LOW);
-    LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
+      // set DONE high for 100 micro seconds to tell the TPL5010 we're done
+      // if DONE was not high between TPL5010 interrupts, TPL5010 will reset the MCU through the reset pin if connected, otherwise it will do nothing until 'DONE' was set high once
+      digitalWrite(donePin, HIGH);
+      delayMicroseconds(100);
+      digitalWrite(donePin, LOW);
+      LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
 
-    // LMIC uses micros() to keep track of the duty cycle, so
-    // hack timer0_overflow for a rude adjustment:
-    timer0_overflow_count += TX_INTERVAL * 64 * clockCyclesPerMicrosecond();
+      // LMIC uses micros() to keep track of the duty cycle, so
+      // hack timer0_overflow for a rude adjustment:
+      timer0_overflow_count += TX_INTERVAL * 64 * clockCyclesPerMicrosecond();
 
-    next = false;
-    do_send(&sendjob);
+      next = false;
+      do_send(&sendjob);
+	}
   }
 }
 
@@ -370,4 +391,18 @@ int readBattVoltage() {
   //Convert analog ADC reading to millivolts
   int _voltage = (((ADCreading * AREF / 1024.0) * (RSUP + RGND) / RGND) * 100);
   return _voltage;
+}
+void do_sendmac(osjob_t* j) {
+	// This function is called if we need to process a MAC message
+    // Check if there is not a current TX/RX job running
+    if (LMIC.opmode & OP_TXRXPEND) {
+        Serial.println(F("OP_TXRXPEND, not sending"));
+    }
+    else {
+        // Prepare upstream data transmission at the next possible time.
+        byte mydata[1];
+        LMIC_setTxData2(0, mydata, sizeof(mydata), 0);
+        Serial.println(F("Packet queued (MAC command)"));
+    }
+    // Next TX is scheduled after TX_COMPLETE event.
 }
