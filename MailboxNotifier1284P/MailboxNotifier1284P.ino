@@ -44,10 +44,10 @@
 #define FILLMEIN_APPEUI 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 #define FILLMEIN_DEVEUI 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 #define FILLMEIN_APPKEY 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-// #include "TTN_Credentials.h"
+#include "TTN_Credentials_Test.h"
 
 
-// #define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #define DEBUGPRINT(x) Serial.print(x)
@@ -261,6 +261,9 @@ void do_send(osjob_t* j) {
     // Prepare upstream data transmission at the next possible time.
     int voltage = readBattVoltage();
 
+    DEBUGPRINT("reason ");
+    DEBUGPRINTLN(wakeupReason);
+
     DEBUGPRINT("voltage ");
     DEBUGPRINTLN(voltage);
 
@@ -276,13 +279,13 @@ void do_send(osjob_t* j) {
       function decodeUplink(input) {
       var data = {};
       if (input.fPort == 1) {
-        data.voltage = ((input.bytes[1] << 8) | input.bytes[2]) / 100.00;
-        data.reason = (input.bytes[0]);
+      data.voltage = ((input.bytes[1] << 8) | input.bytes[2]) / 100.00;
+      data.reason = (input.bytes[0]);
       }
       return {
-        data: data,
-        warnings: [],
-        errors: []
+      data: data,
+      warnings: [],
+      errors: []
       };
       }
 
@@ -303,13 +306,13 @@ void wakeupFromTimer(void) {
 }
 
 void wakeupFromDoorSwitch(void) {
-  wakeupReason = 2;
-  DEBUGPRINTLN("User Interrupt");
+  if (digitalRead(doorSwitch) == HIGH) wakeupReason = 2;
+  DEBUGPRINTLN("Door");
 }
 
 void wakeupFromLidSwitch(void) {
-  wakeupReason = 3;
-  DEBUGPRINTLN("Door");
+  if (digitalRead(lidSwitch) == HIGH) wakeupReason = 3;
+  DEBUGPRINTLN("Lid");
 }
 
 uint16_t analogOversample(int pin) {
@@ -353,13 +356,6 @@ void setup() {
   Serial.begin(115200);
   DEBUGPRINTLN("Starting");
 
-#ifdef VCC_ENABLE
-  // For Pinoccio Scout boards
-  pinMode(VCC_ENABLE, OUTPUT);
-  digitalWrite(VCC_ENABLE, HIGH);
-  delay(1000);
-#endif
-
   // Pin settings for TPL5010 usage
   pinMode(TPLWakePin, INPUT);
   pinMode(donePin, OUTPUT);
@@ -369,13 +365,13 @@ void setup() {
   pinMode(lidSwitch, INPUT);
 
   // Attach TPL5010 interrupt
-  attachPCINT(digitalPinToPCINT(TPLWakePin), wakeupFromTimer, HIGH);
+  attachPCINT(digitalPinToPCINT(TPLWakePin), wakeupFromTimer, CHANGE);
 
   // Attach user interrupt pin
-  attachPCINT(digitalPinToPCINT(lidSwitch), wakeupFromLidSwitch, HIGH);
+  attachPCINT(digitalPinToPCINT(lidSwitch), wakeupFromLidSwitch, CHANGE);
 
   // Attach user interrupt pin
-  attachPCINT(digitalPinToPCINT(doorSwitch), wakeupFromDoorSwitch, HIGH);
+  attachPCINT(digitalPinToPCINT(doorSwitch), wakeupFromDoorSwitch, CHANGE);
 
   // Pin settings to read supply voltage
   analogReference(INTERNAL1V1);         // Set internal reference to 1.1V
@@ -426,12 +422,14 @@ void loop() {
       digitalWrite(donePin, LOW);
       LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
 
-      // LMIC uses micros() to keep track of the duty cycle, so
-      // hack timer0_overflow for a rude adjustment:
-      timer0_overflow_count += TX_INTERVAL * 64 * clockCyclesPerMicrosecond();
-
-      next = false;
-      do_send(&sendjob);
+      // wakeupReason 99 means that the interrupt was called on a falling edge. We only want to trigger the transmit on the rising edge
+      if (wakeupReason < 99) {
+        // LMIC uses micros() to keep track of the duty cycle, so
+        // hack timer0_overflow for a rude adjustment:
+        timer0_overflow_count += TX_INTERVAL * 64 * clockCyclesPerMicrosecond();
+        next = false;
+        do_send(&sendjob);
+      }
     }
   }
 }

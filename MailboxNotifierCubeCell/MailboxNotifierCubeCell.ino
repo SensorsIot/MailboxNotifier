@@ -37,7 +37,7 @@ DeviceClass_t  loraWanClass = LORAWAN_CLASS;
 
 /*the application data transmission duty cycle.  value in [ms].*/
 /*For this example, this is the frequency of the device status packets */
-uint32_t appTxDutyCycle = (1 * 60 * 60 * 1000); // ever hour;
+uint32_t appTxDutyCycle = (1 * 1 * 30 * 1000); // ever hour;
 
 /*OTAA or ABP*/
 bool overTheAirActivation = LORAWAN_NETMODE;
@@ -83,7 +83,7 @@ static bool prepareTxFrame( uint8_t port )
   uint16_t voltage;
   appDataSize = 3;//AppDataSize max value is 64
   appPort = port;
-  voltage = getBatteryVoltage();
+  voltage = (int)getBatteryVoltage()/10;
   Serial.println(voltage);
   Serial.println(voltage, HEX);
   appDataSize = 3;//AppDataSize max value is 64
@@ -93,11 +93,11 @@ static bool prepareTxFrame( uint8_t port )
   Serial.println(appData[2], HEX);
   switch (port) {
     case APPPORT: // woke up from interrupt
-      appData[0] = interruptPin; // set to something useful
+      appData[0] = 0x02; // set to something useful
       break;
     case DEVPORT: // daily wake up
       Serial.println("Sending dev status packet");
-      appData[0] = 0xA0; // set to something else useful
+      appData[0] = 0x01; // set to something else useful
       break;
   }
   return true;
@@ -156,6 +156,7 @@ void loop()
     case DEVICE_STATE_SEND:
       {
         prepareTxFrame( DEVPORT );
+ //       LoRaWAN.setDataRateForNoADR(2);
         LoRaWAN.send();
         deviceState = DEVICE_STATE_CYCLE;
         break;
