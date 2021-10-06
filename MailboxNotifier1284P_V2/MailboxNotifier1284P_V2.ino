@@ -44,15 +44,13 @@
 #define FILLMEIN_APPEUI 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 #define FILLMEIN_DEVEUI 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 #define FILLMEIN_APPKEY 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-#include "TTN_Credentials_Test.h"
+//#include "TTN_Credentials.h"
 
 enum wakeupReasons {
   unknown,
   door,
   lid
 };
-
-
 
 #define DEBUG
 
@@ -72,9 +70,9 @@ const int lidSwitch = 17; // lid switch connected to SDA pin
 uint8_t wakeupReason = 0; // set to 0 means startup, set to 1 means wakeup from TPL5010, set to 2 means wakeup from user pin, set to 3 means unknown wakeup reason
 int batteryReadPin = A0;        // set the input pin for the battery measurement
 int voltageDividerPin = 0;      // set the pin to enable the voltage divider
-const float AREF = 1.104;         // internal reference votlage, for better accuracy use the printed value on the sticker!
-const float RGND = 20.02;          // voltage divider resistor from A0 to GND, for better accuracy use the printed value on the sticker! Value in K ohms
-const float RSUP = 99.9;         // voltage divider resistor from A0 to VCC or UREG depending on solder jumper, for better accuracy use the printed value on the sticker! Value in K ohms
+const float AREF = 1.0833;         // internal reference votlage, for better accuracy use the printed value on the sticker!
+const float RGND = 20.051;          // voltage divider resistor from A0 to GND, for better accuracy use the printed value on the sticker! Value in K ohms
+const float RSUP = 99.98;         // voltage divider resistor from A0 to VCC or UREG depending on solder jumper, for better accuracy use the printed value on the sticker! Value in K ohms
 
 bool mailAvailable = false;
 
@@ -318,20 +316,20 @@ void wakeupFromTimer(void) {
   DEBUGPRINTLN("Timer Interrupt");
 }
 
-void wakeupFromDoorSwitch(void) {
-  if (digitalRead(doorSwitch) == HIGH) {
+void wakeupFromLidSwitch(void) {
+  if (digitalRead(lidSwitch) == HIGH) {
     wakeupReason = 2;
     mailAvailable = true;
   }
-  DEBUGPRINTLN("Door");
+  DEBUGPRINTLN("Lid");
 }
 
-void wakeupFromLidSwitch(void) {
-  if (digitalRead(lidSwitch) == HIGH) {
+void wakeupFromDoorSwitch(void) {
+  if (digitalRead(doorSwitch) == HIGH) {
     wakeupReason = 3;
     mailAvailable = true;
   }
-  DEBUGPRINTLN("Lid");
+  DEBUGPRINTLN("Door");
 }
 
 uint16_t analogOversample(int pin) {
